@@ -76,3 +76,8 @@ int downloader_fetch_audio(const char *url, const char *out_dir, char *warn, siz
     snprintf(warn, warn_sz, "download concluido via yt-dlp");
     return 0;
 }
+
+int downloader_install(char *warn, size_t warn_sz) {
+    char exe[CARTAG_PATH_MAX];
+    return ensure_ytdlp(exe, sizeof(exe), warn, warn_sz);
+}

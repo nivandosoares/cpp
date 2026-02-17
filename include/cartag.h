@@ -113,6 +113,7 @@ void dedupe_mark(TrackList *list, LibraryStats *stats);
 void simulate_print(const TrackList *list, SimulateMode mode, LibraryStats *stats);
 
 int downloader_is_url(const char *s);
+int downloader_install(char *warn, size_t warn_sz);
 int downloader_fetch_audio(const char *url, const char *out_dir, char *warn, size_t warn_sz);
 
 int exporter_run(const TrackList *list, const CliOptions *opts);
