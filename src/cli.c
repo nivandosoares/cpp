@@ -15,7 +15,8 @@ int cli_parse(int argc, char **argv, CliOptions *opts) {
     opts->simulate = SIM_NONE;
 
     if (argc < 2) {
-        return -1;
+        opts->interactive_tui = 1;
+        return 0;
     }
 
     for (i = 1; i < argc; ++i) {
@@ -23,6 +24,8 @@ int cli_parse(int argc, char **argv, CliOptions *opts) {
 
         if (is_flag(arg, "--help") || is_flag(arg, "-h")) {
             return -1;
+        } else if (is_flag(arg, "--tui")) {
+            opts->interactive_tui = 1;
         } else if (is_flag(arg, "--keep-format")) {
             opts->keep_format = 1;
         } else if (is_flag(arg, "--convert-mp3")) {
@@ -78,6 +81,7 @@ int cli_parse(int argc, char **argv, CliOptions *opts) {
 void cli_print_help(void) {
     printf("cartag - organizador offline para pendrive automotivo\n\n");
     printf("Uso: cartag <path-ou-url> [opcoes]\n");
+    printf("  --tui\n");
     printf("  --keep-format\n");
     printf("  --convert-mp3\n");
     printf("  --group-by-format\n");

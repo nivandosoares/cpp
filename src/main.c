@@ -16,9 +16,22 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if (strncmp(opts.input, "http://", 7) == 0 || strncmp(opts.input, "https://", 8) == 0) {
-        fprintf(stderr, "URL recebida: modo offline nao faz download automatico. Forneca pasta local.\n");
-        return 2;
+    if (opts.interactive_tui) {
+        if (tui_run(&opts) != 0) {
+            printf("Encerrado pelo usuario.\n");
+            return 0;
+        }
+    }
+
+    if (downloader_is_url(opts.input)) {
+        char warn[256];
+        const char *download_dir = ".cartag/downloads";
+        if (downloader_fetch_audio(opts.input, download_dir, warn, sizeof(warn)) != 0) {
+            fprintf(stderr, "Erro download: %s\n", warn);
+            return 2;
+        }
+        printf("[INFO] %s\n", warn);
+        snprintf(opts.input, sizeof(opts.input), "%s", download_dir);
     }
 
     if (fs_scan_audio(opts.input, &list) != 0) {
@@ -37,24 +50,18 @@ int main(int argc, char **argv) {
         }
 
         audio_can_play_car(t, opts.car_safe, warn, sizeof(warn));
-        if (warn[0]) {
-            printf("[WARN] %s: %s\n", t->filename, warn);
-        }
+        if (warn[0]) printf("[WARN] %s: %s\n", t->filename, warn);
 
         warn[0] = '\0';
         audio_convert_if_needed(t, &opts, warn, sizeof(warn));
-        if (warn[0]) {
-            printf("[INFO] %s: %s\n", t->filename, warn);
-        }
+        if (warn[0]) printf("[INFO] %s: %s\n", t->filename, warn);
 
         stats.total_tracks++;
         stats.total_duration += (uint64_t)t->duration_seconds;
         stats.format_count[t->format]++;
     }
 
-    if (opts.dedupe || opts.car_safe) {
-        dedupe_mark(&list, &stats);
-    }
+    if (opts.dedupe || opts.car_safe) dedupe_mark(&list, &stats);
 
     organizer_plan(&list, &opts);
     if (opts.prefix || opts.car_safe) organizer_apply_prefix(&list);
