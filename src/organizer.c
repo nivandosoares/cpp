@@ -48,6 +48,12 @@ void organizer_plan(TrackList *list, const CliOptions *opts) {
             snprintf(t->out_path, sizeof(t->out_path), "%s/%s/%02d - %s%s", t->artist, t->album, t->track_no, t->title, ext);
         } else if (opts->organize == ORG_FLAT) {
             snprintf(t->out_path, sizeof(t->out_path), "%s%s", t->title, ext);
+        } else if (opts->organize == ORG_GENRE_ARTIST) {
+            snprintf(t->out_path, sizeof(t->out_path), "%s/%s/%s%s",
+                     t->genre[0] ? t->genre : "Unknown",
+                     t->artist[0] ? t->artist : "Unknown Artist",
+                     t->title,
+                     ext);
         } else {
             str_copy(t->out_path, sizeof(t->out_path), t->filename);
         }

@@ -4,6 +4,23 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
+static void pause_for_results_if_tty(void) {
+#ifndef _WIN32
+    if (isatty(0)) {
+        char dummy[8];
+        printf("\nPressione ENTER para voltar para a UI...\n");
+        fflush(stdout);
+        if (!fgets(dummy, sizeof(dummy), stdin)) {
+            dummy[0] = '\0';
+        }
+    }
+#endif
+}
+
 static int run_pipeline(CliOptions *opts) {
     TrackList list;
     LibraryStats stats;
@@ -13,7 +30,7 @@ static int run_pipeline(CliOptions *opts) {
 
     if (downloader_is_url(opts->input)) {
         char warn[256];
-        const char *download_dir = ".cartag/downloads";
+        const char *download_dir = ".";
         if (downloader_fetch_audio(opts->input, download_dir, warn, sizeof(warn)) != 0) {
             fprintf(stderr, "Erro download: %s\n", warn);
             return 2;
@@ -54,13 +71,6 @@ static int run_pipeline(CliOptions *opts) {
     organizer_plan(&list, opts);
     if (opts->prefix || opts->car_safe) organizer_apply_prefix(&list);
 
-    if (opts->normalize_volume) {
-        printf("[INFO] normalize-volume habilitado: usar ffmpeg loudnorm quando disponivel (TODO detalhado).\n");
-    }
-    if (opts->strip_art || opts->resize_art || opts->extract_art) {
-        printf("[INFO] gerenciamento de capas solicitado (strip/resize/extract) em modo leve.\n");
-    }
-
     diagnostics_print(&list);
     simulate_print(&list, opts->simulate, &stats);
     exporter_run(&list, opts);
@@ -97,5 +107,6 @@ int main(int argc, char **argv) {
         } else {
             printf("[INFO] pipeline concluido. Lista sera atualizada na UI.\n");
         }
+        pause_for_results_if_tty();
     }
 }

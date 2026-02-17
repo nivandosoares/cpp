@@ -23,7 +23,8 @@ typedef enum {
     ORG_NONE = 0,
     ORG_ARTIST,
     ORG_ALBUM,
-    ORG_FLAT
+    ORG_FLAT,
+    ORG_GENRE_ARTIST
 } OrganizeMode;
 
 typedef enum {

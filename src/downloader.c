@@ -24,32 +24,34 @@ int downloader_is_url(const char *s) {
 static int ensure_ytdlp(char *exe, size_t exe_sz, char *warn, size_t warn_sz) {
     if (cmd_ok("yt-dlp --version > /dev/null 2>&1")) {
         snprintf(exe, exe_sz, "yt-dlp");
+        snprintf(warn, warn_sz, "yt-dlp encontrado no sistema");
         return 0;
     }
 
-    fs_ensure_directory(".cartag");
-    fs_ensure_directory(".cartag/bin");
-
 #ifdef _WIN32
-    snprintf(exe, exe_sz, ".cartag\\bin\\yt-dlp.exe");
-    if (ACCESS(exe, 0) == 0) return 0;
-    if (!cmd_ok("powershell -Command \"Invoke-WebRequest -Uri https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe -OutFile .cartag\\bin\\yt-dlp.exe\"")) {
-        snprintf(warn, warn_sz, "nao foi possivel baixar yt-dlp automaticamente");
+    snprintf(exe, exe_sz, "./yt-dlp.exe");
+    if (ACCESS(exe, 0) == 0) {
+        snprintf(warn, warn_sz, "yt-dlp local ja disponivel");
+        return 0;
+    }
+    if (!cmd_ok("curl -L --fail https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe -o yt-dlp.exe > NUL 2>&1")) {
+        snprintf(warn, warn_sz, "falha ao baixar yt-dlp.exe via curl");
         return -1;
     }
 #else
-    snprintf(exe, exe_sz, "./.cartag/bin/yt-dlp");
-    if (ACCESS(exe, X_OK) == 0) return 0;
-    if (!cmd_ok("curl -L --fail https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o .cartag/bin/yt-dlp > /dev/null 2>&1") &&
-        !cmd_ok("wget -q https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -O .cartag/bin/yt-dlp") &&
-        !cmd_ok("python3 -c \"import urllib.request as r;u='https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp';open('.cartag/bin/yt-dlp','wb').write(r.urlopen(u,timeout=30).read())\" > /dev/null 2>&1")) {
-        snprintf(warn, warn_sz, "nao foi possivel baixar yt-dlp automaticamente");
+    snprintf(exe, exe_sz, "./yt-dlp");
+    if (ACCESS(exe, X_OK) == 0) {
+        snprintf(warn, warn_sz, "yt-dlp local ja disponivel");
+        return 0;
+    }
+    if (!cmd_ok("curl -L --fail https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o yt-dlp > /dev/null 2>&1")) {
+        snprintf(warn, warn_sz, "falha ao baixar yt-dlp via curl");
         return -1;
     }
-    cmd_ok("chmod +x .cartag/bin/yt-dlp");
+    cmd_ok("chmod +x yt-dlp");
 #endif
 
-    snprintf(warn, warn_sz, "yt-dlp baixado automaticamente");
+    snprintf(warn, warn_sz, "yt-dlp instalado no diretorio atual");
     return 0;
 }
 
@@ -57,13 +59,18 @@ int downloader_fetch_audio(const char *url, const char *out_dir, char *warn, siz
     char exe[CARTAG_PATH_MAX];
     char cmd[4096];
 
+    if (!downloader_is_url(url)) {
+        snprintf(warn, warn_sz, "URL invalida");
+        return -1;
+    }
+
     if (ensure_ytdlp(exe, sizeof(exe), warn, warn_sz) != 0) {
         return -1;
     }
 
     fs_ensure_directory(out_dir);
     snprintf(cmd, sizeof(cmd),
-             "%s -x --audio-format mp3 --audio-quality 0 --embed-metadata --no-playlist -o \"%s/%%(title)s.%%(ext)s\" \"%s\" > /dev/null 2>&1",
+             "%s -x --audio-format mp3 --audio-quality 0 --embed-metadata --no-playlist -o \"%s/%%(title)s.%%(ext)s\" \"%s\"",
              exe,
              out_dir,
              url);
@@ -73,7 +80,7 @@ int downloader_fetch_audio(const char *url, const char *out_dir, char *warn, siz
         return -1;
     }
 
-    snprintf(warn, warn_sz, "download concluido via yt-dlp");
+    snprintf(warn, warn_sz, "download concluido no diretorio atual");
     return 0;
 }
 

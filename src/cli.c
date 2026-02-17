@@ -57,6 +57,7 @@ int cli_parse(int argc, char **argv, CliOptions *opts) {
             if (strcmp(mode, "artist") == 0) opts->organize = ORG_ARTIST;
             else if (strcmp(mode, "album") == 0) opts->organize = ORG_ALBUM;
             else if (strcmp(mode, "flat") == 0) opts->organize = ORG_FLAT;
+            else if (strcmp(mode, "genre-artist") == 0) opts->organize = ORG_GENRE_ARTIST;
         } else if (is_flag(arg, "--simulate") && i + 1 < argc) {
             const char *mode = argv[++i];
             if (strcmp(mode, "generic") == 0) opts->simulate = SIM_GENERIC;
@@ -91,7 +92,7 @@ void cli_print_help(void) {
     printf("  --strip-art\n");
     printf("  --resize-art <px>\n");
     printf("  --extract-art\n");
-    printf("  --organize artist|album|flat\n");
+    printf("  --organize artist|album|flat|genre-artist\n");
     printf("  --simulate generic|fat|filename\n");
     printf("  --car-safe\n");
     printf("  --export <destino>\n");

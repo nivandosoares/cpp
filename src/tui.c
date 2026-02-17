@@ -16,7 +16,7 @@
 
 #define FILE_ROWS 8
 #define UTIL_ROWS 8
-#define UTIL_COUNT 12
+#define UTIL_COUNT 13
 
 typedef struct {
     TrackList list;
@@ -27,6 +27,18 @@ typedef struct {
 typedef enum { FOCUS_FILES = 0, FOCUS_UTILS = 1 } UiFocus;
 typedef enum { KEY_NONE = 0, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_TAB, KEY_ENTER, KEY_ESC, KEY_CHAR } UiKey;
 typedef struct { UiKey key; int ch; } KeyEvent;
+
+typedef enum { TAB_FILE=0, TAB_OPTIONS, TAB_VIEW, TAB_TREE, TAB_HELP, TAB_COUNT } UiTab;
+
+static const char *k_tabs[TAB_COUNT] = {"File", "Options", "View", "Tree", "Help"};
+
+static const char *k_submenus[TAB_COUNT] = {
+    "Open  Save  Export  Exit",
+    "Car-Safe  Dedupe  Fix-Tags  Organize",
+    "Simulate  Refresh  Stats",
+    "Genre->Artist  Artist  Album  Flat",
+    "Keys  About  Tips"
+};
 
 #ifdef _WIN32
 static HANDLE g_hout = NULL;
@@ -47,6 +59,7 @@ static const char *k_utils[UTIL_COUNT] = {
     "Toggle Dedupe",
     "Toggle Fix Tags",
     "Simulate Filename",
+    "Organize: Genre/Artist",
     "Run Pipeline",
     "Quit"
 };
@@ -121,20 +134,28 @@ static void preview_load(const CliOptions *opts, PreviewState *pv) {
 
 static void draw_line(const char *s) { printf("%-78.78s\n", s); }
 
-static void draw_top(void) {
+static void draw_top(UiTab tab_sel) {
 #ifdef _WIN32
     ui_clear_home();
     ui_set_attr(BACKGROUND_BLUE | FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
 #else
     printf("\033[2J\033[H\033[44;37m");
 #endif
-    draw_line(" File  Options  View  Tree  Help                                   MS-DOS Shell ");
+    char tabline[120];
+    snprintf(tabline, sizeof(tabline), " %s  %s  %s  %s  %s                               MS-DOS Shell ",
+             tab_sel==TAB_FILE?"[File]":k_tabs[TAB_FILE],
+             tab_sel==TAB_OPTIONS?"[Options]":k_tabs[TAB_OPTIONS],
+             tab_sel==TAB_VIEW?"[View]":k_tabs[TAB_VIEW],
+             tab_sel==TAB_TREE?"[Tree]":k_tabs[TAB_TREE],
+             tab_sel==TAB_HELP?"[Help]":k_tabs[TAB_HELP]);
+    draw_line(tabline);
 #ifdef _WIN32
     ui_set_attr(BACKGROUND_GREEN | BACKGROUND_BLUE);
 #else
     printf("\033[46;30m");
 #endif
-    draw_line(" C:\\   [A:] [B:] [C:] [D:] [E:] [F:]                             Cartag UI   ");
+    draw_line(" C:\\   [A:] [B:] [C:] [D:] [E:] [F:] [USB:]                      Cartag UI   ");
+    draw_line(k_submenus[(int)tab_sel]);
 #ifdef _WIN32
     ui_reset_attr();
 #else
@@ -162,14 +183,16 @@ static void draw_status(const char *msg) {
 #endif
 }
 
-static void draw_main(const CliOptions *opts, const PreviewState *pv, UiFocus focus, int util_sel, const char *msg) {
+static void draw_main(const CliOptions *opts, const PreviewState *pv, UiFocus focus, int util_sel, UiTab tab_sel, const char *msg) {
     char left[128], right[64], line[200];
     size_t i;
 
-    draw_top();
+    draw_top(tab_sel);
     draw_line("+--------------------------------+-------------------------------------------+");
     draw_line("| Directory Tree                 | C:*.*                                      |");
     snprintf(line, sizeof(line), "| [DIR] %-25.25s | input: %-35.35s |", opts->input[0] ? opts->input : "(not set)", opts->input[0] ? opts->input : "(not set)");
+    draw_line(line);
+    snprintf(line, sizeof(line), "| [TREE] Genre->Artist=%-3s      | export: %-34.34s |", opts->organize == ORG_GENRE_ARTIST ? "on" : "off", opts->export_path[0] ? opts->export_path : "(not set)");
     draw_line(line);
 
     for (i = 0; i < FILE_ROWS; ++i) {
@@ -316,12 +339,18 @@ static int do_utility(int idx, CliOptions *opts, PreviewState *pv, char *msg, si
             else str_copy(msg, msg_sz, warn);
             break;
         case 4:
-            if (!downloader_is_url(opts->input)) {
-                str_copy(msg, msg_sz, "Input atual nao e URL.");
-            } else if (downloader_fetch_audio(opts->input, ".cartag/downloads", warn, sizeof(warn)) == 0) {
-                str_copy(opts->input, sizeof(opts->input), ".cartag/downloads");
+            if (prompt_line("YouTube URL para download: ", buf, sizeof(buf)) != 0 || !buf[0]) {
+                str_copy(msg, msg_sz, "URL nao informada.");
+                break;
+            }
+            if (!downloader_is_url(buf)) {
+                str_copy(msg, msg_sz, "URL invalida.");
+                break;
+            }
+            if (downloader_fetch_audio(buf, ".", warn, sizeof(warn)) == 0) {
+                str_copy(opts->input, sizeof(opts->input), ".");
                 preview_load(opts, pv);
-                str_copy(msg, msg_sz, "Download concluido e lista atualizada.");
+                str_copy(msg, msg_sz, "Download concluido no diretorio atual.");
             } else {
                 str_copy(msg, msg_sz, warn);
             }
@@ -342,8 +371,12 @@ static int do_utility(int idx, CliOptions *opts, PreviewState *pv, char *msg, si
         case 7: opts->dedupe = !opts->dedupe; str_copy(msg, msg_sz, opts->dedupe ? "Dedupe ON" : "Dedupe OFF"); break;
         case 8: opts->fix_tags = !opts->fix_tags; str_copy(msg, msg_sz, opts->fix_tags ? "Fix tags ON" : "Fix tags OFF"); break;
         case 9: opts->simulate = SIM_FILENAME; str_copy(msg, msg_sz, "Simulate filename ON"); break;
-        case 10: if (opts->input[0] == '\0') str_copy(opts->input, sizeof(opts->input), "."); return 1;
-        case 11: return -1;
+        case 10:
+            opts->organize = (opts->organize == ORG_GENRE_ARTIST) ? ORG_ARTIST : ORG_GENRE_ARTIST;
+            str_copy(msg, msg_sz, opts->organize == ORG_GENRE_ARTIST ? "Organize: Genre/Artist ON" : "Organize: Artist ON");
+            break;
+        case 11: if (opts->input[0] == '\0') str_copy(opts->input, sizeof(opts->input), "."); return 1;
+        case 12: return -1;
         default: break;
     }
     return 0;
@@ -375,6 +408,7 @@ int tui_run(CliOptions *opts) {
     PreviewState pv;
     UiFocus focus = FOCUS_UTILS;
     int util_sel = 0;
+    UiTab tab_sel = TAB_FILE;
     char msg[128];
 
     memset(&pv, 0, sizeof(pv));
@@ -391,7 +425,7 @@ int tui_run(CliOptions *opts) {
         KeyEvent ev;
         int rc;
 
-        draw_main(opts, &pv, focus, util_sel, msg);
+        draw_main(opts, &pv, focus, util_sel, tab_sel, msg);
         ev = read_key_event();
 
         if (ev.key == KEY_ESC) {
@@ -402,8 +436,16 @@ int tui_run(CliOptions *opts) {
             return -1;
         }
 
-        if (ev.key == KEY_TAB || ev.key == KEY_LEFT || ev.key == KEY_RIGHT) {
+        if (ev.key == KEY_TAB) {
             focus = (focus == FOCUS_FILES) ? FOCUS_UTILS : FOCUS_FILES;
+            continue;
+        }
+        if (ev.key == KEY_LEFT) {
+            tab_sel = (tab_sel == 0) ? (TAB_COUNT - 1) : (UiTab)(tab_sel - 1);
+            continue;
+        }
+        if (ev.key == KEY_RIGHT) {
+            tab_sel = (UiTab)((tab_sel + 1) % TAB_COUNT);
             continue;
         }
 
@@ -413,7 +455,7 @@ int tui_run(CliOptions *opts) {
             if (pv.selected < pv.scroll) pv.scroll = pv.selected;
             if (pv.selected >= pv.scroll + FILE_ROWS) pv.scroll = pv.selected - FILE_ROWS + 1;
             if (ev.key == KEY_CHAR && (ev.ch == 'r' || ev.ch == 'R')) {
-                rc = do_utility(10, opts, &pv, msg, sizeof(msg));
+                rc = do_utility(11, opts, &pv, msg, sizeof(msg));
                 if (rc == 1) {
 #ifndef _WIN32
                     ui_disable_raw_mode();
@@ -426,8 +468,8 @@ int tui_run(CliOptions *opts) {
             if (ev.key == KEY_UP && util_sel > 0) util_sel--;
             else if (ev.key == KEY_DOWN && util_sel + 1 < UTIL_COUNT) util_sel++;
             else if (ev.key == KEY_ENTER || ev.key == KEY_CHAR) {
-                if (ev.key == KEY_CHAR && (ev.ch == 'q' || ev.ch == 'Q')) util_sel = 11;
-                if (ev.key == KEY_CHAR && (ev.ch == 'r' || ev.ch == 'R')) util_sel = 10;
+                if (ev.key == KEY_CHAR && (ev.ch == 'q' || ev.ch == 'Q')) util_sel = 12;
+                if (ev.key == KEY_CHAR && (ev.ch == 'r' || ev.ch == 'R')) util_sel = 11;
                 rc = do_utility(util_sel, opts, &pv, msg, sizeof(msg));
                 if (rc == 1) {
 #ifndef _WIN32
