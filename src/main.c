@@ -97,7 +97,6 @@ int main(int argc, char **argv) {
         int pipe_rc;
 
         if (ui_rc != 0) {
-            printf("Encerrado pelo usuario.\n");
             return 0;
         }
 

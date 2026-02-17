@@ -412,8 +412,69 @@ int tui_run(CliOptions *opts) {
 }
 
 #else
+static void win_str_copy(char *dst, size_t dst_sz, const char *src) {
+    size_t n;
+    if (!dst || dst_sz == 0) return;
+    if (!src) { dst[0] = '\0'; return; }
+    n = strlen(src);
+    if (n >= dst_sz) n = dst_sz - 1;
+    memcpy(dst, src, n);
+    dst[n] = '\0';
+}
+
 int tui_run(CliOptions *opts) {
-    (void)opts;
-    return -1;
+    char cmd[64];
+    char buf[CARTAG_PATH_MAX];
+    char warn[256];
+
+    for (;;) {
+        printf("\n=== CARTAG DOS UI (Windows fallback) ===\n");
+        printf("input=%s | export=%s\n",
+               opts->input[0] ? opts->input : "(not set)",
+               opts->export_path[0] ? opts->export_path : "(not set)");
+        printf("tabs: [F]ile [O]ptions [V]iew [T]ree [H]elp\n");
+        printf("utils: d=input e=export y=url i=install-yt l=list g=genre-artist r=run q=quit\n> ");
+        if (!fgets(cmd, sizeof(cmd), stdin)) return -1;
+
+        if (cmd[0] == 'q' || cmd[0] == 'Q') return -1;
+        if (cmd[0] == 'd' || cmd[0] == 'D') {
+            printf("Input path: ");
+            if (fgets(buf, sizeof(buf), stdin)) {
+                buf[strcspn(buf, "\r\n")] = '\0';
+                if (buf[0]) win_str_copy(opts->input, sizeof(opts->input), buf);
+            }
+        } else if (cmd[0] == 'e' || cmd[0] == 'E') {
+            printf("Export path: ");
+            if (fgets(buf, sizeof(buf), stdin)) {
+                buf[strcspn(buf, "\r\n")] = '\0';
+                if (buf[0]) win_str_copy(opts->export_path, sizeof(opts->export_path), buf);
+            }
+        } else if (cmd[0] == 'y' || cmd[0] == 'Y') {
+            printf("YouTube URL: ");
+            if (fgets(buf, sizeof(buf), stdin)) {
+                buf[strcspn(buf, "\r\n")] = '\0';
+                if (buf[0]) win_str_copy(opts->input, sizeof(opts->input), buf);
+            }
+        } else if (cmd[0] == 'i' || cmd[0] == 'I') {
+            if (downloader_install(warn, sizeof(warn)) == 0) printf("[OK] %s\n", warn);
+            else printf("[WARN] %s\n", warn);
+        } else if (cmd[0] == 'l' || cmd[0] == 'L') {
+            TrackList list;
+            memset(&list, 0, sizeof(list));
+            if (opts->input[0] == '\0') win_str_copy(opts->input, sizeof(opts->input), ".");
+            if (fs_scan_audio(opts->input, &list) == 0) {
+                printf("Eligible tracks: %zu\n", list.count);
+            } else {
+                printf("Falha ao listar: %s\n", opts->input);
+            }
+            free(list.tracks);
+        } else if (cmd[0] == 'g' || cmd[0] == 'G') {
+            opts->organize = (opts->organize == ORG_GENRE_ARTIST) ? ORG_ARTIST : ORG_GENRE_ARTIST;
+            printf("Organize mode: %s\n", opts->organize == ORG_GENRE_ARTIST ? "genre/artist" : "artist");
+        } else if (cmd[0] == 'r' || cmd[0] == 'R') {
+            if (opts->input[0] == '\0') win_str_copy(opts->input, sizeof(opts->input), ".");
+            return 0;
+        }
+    }
 }
 #endif
