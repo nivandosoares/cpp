@@ -6,6 +6,7 @@
 #include <time.h>
 
 #ifdef _WIN32
+#include <windows.h>
 #include <conio.h>
 #else
 #include <unistd.h>
@@ -45,7 +46,10 @@ typedef struct {
     int ch;
 } KeyEvent;
 
-#ifndef _WIN32
+#ifdef _WIN32
+static HANDLE g_hout = NULL;
+static WORD g_default_attr = 7;
+#else
 static struct termios g_orig_term;
 static int g_raw_mode = 0;
 #endif
@@ -62,6 +66,40 @@ static const char *k_utils[UTIL_COUNT] = {
     "Run Pipeline",
     "Quit"
 };
+
+
+#ifdef _WIN32
+static void ui_win_init(void) {
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    if (!g_hout) g_hout = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (g_hout && GetConsoleScreenBufferInfo(g_hout, &csbi)) {
+        g_default_attr = csbi.wAttributes;
+    }
+}
+
+static void ui_clear_home(void) {
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    DWORD written = 0;
+    DWORD cells;
+    COORD home = {0, 0};
+
+    ui_win_init();
+    if (!g_hout || !GetConsoleScreenBufferInfo(g_hout, &csbi)) return;
+    cells = (DWORD)csbi.dwSize.X * (DWORD)csbi.dwSize.Y;
+    FillConsoleOutputCharacterA(g_hout, ' ', cells, home, &written);
+    FillConsoleOutputAttribute(g_hout, g_default_attr, cells, home, &written);
+    SetConsoleCursorPosition(g_hout, home);
+}
+
+static void ui_set_attr(WORD attr) {
+    ui_win_init();
+    if (g_hout) SetConsoleTextAttribute(g_hout, attr);
+}
+
+static void ui_reset_attr(void) {
+    ui_set_attr(g_default_attr);
+}
+#endif
 
 static void str_copy(char *dst, size_t dst_sz, const char *src) {
     size_t n;
@@ -143,21 +181,36 @@ static void draw_status_bar(void) {
     char clockbuf[16];
     format_clock(clockbuf, sizeof(clockbuf));
     snprintf(line, sizeof(line), " F10=Actions  TAB=Switch Pane  ENTER=Select  ESC=Quit      %s ", clockbuf);
+#ifdef _WIN32
+    ui_set_attr(BACKGROUND_GREEN | BACKGROUND_BLUE);
+    draw_line_plain(line);
+    ui_reset_attr();
+#else
     printf("\033[46;30m");
     draw_line_plain(line);
     printf("\033[0m");
+#endif
 }
 
 static void draw_ui(const CliOptions *opts, const PreviewState *pv, UiFocus focus, int util_sel, const char *msg) {
     char line[256];
     size_t i;
 
+#ifdef _WIN32
+    ui_clear_home();
+    ui_set_attr(BACKGROUND_BLUE | FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
+    draw_line_plain(" File  Options  View  Tree  Help                                   MS-DOS Shell ");
+    ui_set_attr(BACKGROUND_GREEN | BACKGROUND_BLUE);
+    draw_line_plain(" C:\\                                                                  [Cartag DOS UI] ");
+    ui_reset_attr();
+#else
     printf("\033[2J\033[H");
     printf("\033[44;37m");
     draw_line_plain(" File  Options  View  Tree  Help                                   MS-DOS Shell ");
     printf("\033[46;30m");
     draw_line_plain(" C:\\                                                                  [Cartag DOS UI] ");
     printf("\033[0m");
+#endif
 
     draw_line_plain("+----------------------------- Directory Tree -------------------------------+");
     snprintf(line, sizeof(line), "| Input : %-67.67s |", opts->input[0] ? opts->input : "(not set)");
@@ -194,10 +247,22 @@ static void draw_ui(const CliOptions *opts, const PreviewState *pv, UiFocus focu
                          audio_format_name(t->format),
                          (unsigned long long)t->size_bytes);
 
-                if (focus == FOCUS_FILES && idx == pv->selected) printf("\033[7m");
+                if (focus == FOCUS_FILES && idx == pv->selected) {
+#ifdef _WIN32
+                    ui_set_attr(BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE);
+#else
+                    printf("\033[7m");
+#endif
+                }
                 snprintf(line, sizeof(line), "| %-74.74s |", row);
                 draw_line_plain(line);
-                if (focus == FOCUS_FILES && idx == pv->selected) printf("\033[0m");
+                if (focus == FOCUS_FILES && idx == pv->selected) {
+#ifdef _WIN32
+                    ui_reset_attr();
+#else
+                    printf("\033[0m");
+#endif
+                }
             } else {
                 draw_line_plain("|                                                                            |");
             }
@@ -208,10 +273,22 @@ static void draw_ui(const CliOptions *opts, const PreviewState *pv, UiFocus focu
     for (i = 0; i < UTIL_COUNT; ++i) {
         char row[96];
         snprintf(row, sizeof(row), "%c %-45.45s", i == (size_t)util_sel ? '>' : ' ', k_utils[i]);
-        if (focus == FOCUS_UTILS && i == (size_t)util_sel) printf("\033[7m");
+        if (focus == FOCUS_UTILS && i == (size_t)util_sel) {
+#ifdef _WIN32
+            ui_set_attr(BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE);
+#else
+            printf("\033[7m");
+#endif
+        }
         snprintf(line, sizeof(line), "| %-74.74s |", row);
         draw_line_plain(line);
-        if (focus == FOCUS_UTILS && i == (size_t)util_sel) printf("\033[0m");
+        if (focus == FOCUS_UTILS && i == (size_t)util_sel) {
+#ifdef _WIN32
+            ui_reset_attr();
+#else
+            printf("\033[0m");
+#endif
+        }
     }
 
     snprintf(line, sizeof(line), " Message: %-65.65s", msg ? msg : "Use arrows, TAB and ENTER.");
@@ -281,7 +358,12 @@ static int prompt_line(const char *label, char *out, size_t out_sz) {
 #ifndef _WIN32
     ui_disable_raw_mode();
 #endif
+#ifdef _WIN32
+    ui_reset_attr();
+    printf("\n%s", label);
+#else
     printf("\033[0m\n%s", label);
+#endif
     fflush(stdout);
     if (!fgets(out, (int)out_sz, stdin)) {
 #ifndef _WIN32
