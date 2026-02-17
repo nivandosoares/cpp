@@ -60,9 +60,9 @@ static void draw_panels(const CliOptions *opts, const PreviewState *pv) {
     if (end > pv->total) end = pv->total;
 
     draw_line("+------------------------------ Directory Tree ------------------------------+");
-    snprintf(line, sizeof(line), "| Input: %-67s |", opts->input[0] ? opts->input : "(not set)");
+    snprintf(line, sizeof(line), "| Input: %-67.67s |", opts->input[0] ? opts->input : "(not set)");
     draw_line(line);
-    snprintf(line, sizeof(line), "| Export: %-66s |", opts->export_path[0] ? opts->export_path : "(not set)");
+    snprintf(line, sizeof(line), "| Export: %-66.66s |", opts->export_path[0] ? opts->export_path : "(not set)");
     draw_line(line);
     draw_line("+------------------------------ Eligible Files -------------------------------+");
 

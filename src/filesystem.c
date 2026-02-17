@@ -14,6 +14,19 @@
 #define MKDIR(path) mkdir(path, 0755)
 #endif
 
+static void str_copy(char *dst, size_t dst_sz, const char *src) {
+    size_t n;
+    if (!dst || dst_sz == 0) return;
+    if (!src) {
+        dst[0] = '\0';
+        return;
+    }
+    n = strlen(src);
+    if (n >= dst_sz) n = dst_sz - 1;
+    memcpy(dst, src, n);
+    dst[n] = '\0';
+}
+
 static uint64_t hash_file_quick(const char *path) {
     FILE *f = fopen(path, "rb");
     uint64_t h = 1469598103934665603ULL;
@@ -76,14 +89,14 @@ static int scan_recursive(const char *root, const char *base, TrackList *list, i
         } else if (S_ISREG(st.st_mode) && is_audio_ext(ent->d_name)) {
             AudioTrack t;
             memset(&t, 0, sizeof(t));
-            snprintf(t.path, sizeof(t.path), "%s", full);
+            str_copy(t.path, sizeof(t.path), full);
             if (strncmp(full, base, strlen(base)) == 0) {
-                snprintf(rel, sizeof(rel), "%s", full + strlen(base) + 1);
+                str_copy(rel, sizeof(rel), full + strlen(base) + 1);
             } else {
-                snprintf(rel, sizeof(rel), "%s", ent->d_name);
+                str_copy(rel, sizeof(rel), ent->d_name);
             }
-            snprintf(t.rel_path, sizeof(t.rel_path), "%s", rel);
-            snprintf(t.filename, sizeof(t.filename), "%s", ent->d_name);
+            str_copy(t.rel_path, sizeof(t.rel_path), rel);
+            str_copy(t.filename, sizeof(t.filename), ent->d_name);
             t.format = audio_detect_format(ent->d_name);
             t.size_bytes = (uint64_t)st.st_size;
             t.quick_hash = hash_file_quick(full);
@@ -106,7 +119,7 @@ int fs_ensure_directory(const char *path) {
     char tmp[CARTAG_PATH_MAX];
     size_t len = strlen(path);
     if (len == 0 || len >= sizeof(tmp)) return -1;
-    snprintf(tmp, sizeof(tmp), "%s", path);
+    str_copy(tmp, sizeof(tmp), path);
 
     for (size_t i = 1; i < len; ++i) {
         if (tmp[i] == '/' || tmp[i] == '\\') {
@@ -128,7 +141,7 @@ int fs_copy_file(const char *src, const char *dst) {
 
     if (!in) return -1;
 
-    snprintf(parent, sizeof(parent), "%s", dst);
+    str_copy(parent, sizeof(parent), dst);
     for (int i = (int)strlen(parent) - 1; i >= 0; --i) {
         if (parent[i] == '/' || parent[i] == '\\') {
             parent[i] = '\0';
