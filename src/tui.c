@@ -41,13 +41,13 @@ typedef enum {
     ACT_COUNT
 } ActionId;
 
-static const char *k_tabs[TAB_COUNT] = {"File", "Options", "Actions", "Tree", "Help"};
+static const char *k_tabs[TAB_COUNT] = {"File", "Options", "View", "Tree", "Help"};
 static const char *k_submenus[TAB_COUNT] = {
-    "Open  Export  Refresh  Run  Quit",
+    "Open  Save  Export  Exit",
     "Car-Safe  Dedupe  Fix-Tags  Organize",
-    "Simulate  Refresh  Run",
-    "Artist  Album  Flat  Genre/Artist  Refresh",
-    "URL  Install yt-dlp  Download"
+    "Simulate  Refresh  Status",
+    "Artist  Album  Flat  Genre/Artist",
+    "Keys  Downloader  About"
 };
 
 static const char *k_action_labels[ACT_COUNT] = {
@@ -191,7 +191,7 @@ static void draw_ui(const CliOptions *opts,
     mvprintw(0, 1, "%s  %s  %s  %s  %s",
              tab_sel == TAB_FILE ? "[File]" : k_tabs[TAB_FILE],
              tab_sel == TAB_OPTIONS ? "[Options]" : k_tabs[TAB_OPTIONS],
-             tab_sel == TAB_VIEW ? "[Actions]" : k_tabs[TAB_VIEW],
+             tab_sel == TAB_VIEW ? "[View]" : k_tabs[TAB_VIEW],
              tab_sel == TAB_TREE ? "[Tree]" : k_tabs[TAB_TREE],
              tab_sel == TAB_HELP ? "[Help]" : k_tabs[TAB_HELP]);
     mvprintw(0, w - 16, "MS-DOS Shell");
@@ -275,7 +275,7 @@ static void draw_ui(const CliOptions *opts,
     attron(COLOR_PAIR(2));
     mvhline(h - 1, 0, ' ', w);
     if (tmv) strftime(timebuf, sizeof(timebuf), "%H:%M", tmv); else str_copy(timebuf, sizeof(timebuf), "--:--");
-    mvprintw(h - 1, 1, "F1=Help TAB=Switch <-/->=Tabs ENTER=Exec R=Run Q=Quit ESC=Exit");
+    mvprintw(h - 1, 1, "F10=Actions  Shift+F9=Command Prompt  TAB=Switch  ESC=Exit");
     mvprintw(h - 1, w - 6, "%5s", timebuf);
     attroff(COLOR_PAIR(2));
 
@@ -435,7 +435,7 @@ int tui_run(CliOptions *opts) {
     if (!isatty(0)) return tui_run_fallback(opts);
 
     memset(&pv, 0, sizeof(pv));
-    str_copy(msg, sizeof(msg), "DOSSHELL: TAB troca foco, <-/-> troca menu, ENTER executa.");
+    str_copy(msg, sizeof(msg), "DOSSHELL: TAB troca foco, <-/-> menus, ENTER executa.");
 
     initscr();
     keypad(stdscr, TRUE);
