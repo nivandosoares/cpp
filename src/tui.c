@@ -41,17 +41,17 @@ typedef enum {
     ACT_COUNT
 } ActionId;
 
-static const char *k_tabs[TAB_COUNT] = {"File", "Options", "View", "Tree", "Help"};
+static const char *k_tabs[TAB_COUNT] = {"File", "Options", "Actions", "Tree", "Help"};
 static const char *k_submenus[TAB_COUNT] = {
-    "Open  Save  Export  Exit",
+    "Open  Export  Refresh  Run  Quit",
     "Car-Safe  Dedupe  Fix-Tags  Organize",
-    "Simulate  Refresh  Status",
-    "Artist  Album  Flat  Genre/Artist",
-    "Keys  Downloader  About"
+    "Simulate  Refresh  Run",
+    "Artist  Album  Flat  Genre/Artist  Refresh",
+    "URL  Install yt-dlp  Download"
 };
 
 static const char *k_action_labels[ACT_COUNT] = {
-    "Set Input Path/Drive",
+    "Set Input Path/Drive (DIR)",
     "Set Export Path",
     "Set YouTube URL as Input",
     "Install yt-dlp (curl)",
@@ -68,6 +68,8 @@ static const char *k_action_labels[ACT_COUNT] = {
     "Run Pipeline",
     "Quit"
 };
+
+static const char *k_focus_name[2] = {"FILES", "ACTIONS"};
 
 static const ActionId k_tab_actions[TAB_COUNT][8] = {
     {ACT_SET_INPUT, ACT_SET_EXPORT, ACT_REFRESH_LIST, ACT_RUN_PIPELINE, ACT_QUIT, ACT_COUNT, ACT_COUNT, ACT_COUNT},
@@ -189,7 +191,7 @@ static void draw_ui(const CliOptions *opts,
     mvprintw(0, 1, "%s  %s  %s  %s  %s",
              tab_sel == TAB_FILE ? "[File]" : k_tabs[TAB_FILE],
              tab_sel == TAB_OPTIONS ? "[Options]" : k_tabs[TAB_OPTIONS],
-             tab_sel == TAB_VIEW ? "[View]" : k_tabs[TAB_VIEW],
+             tab_sel == TAB_VIEW ? "[Actions]" : k_tabs[TAB_VIEW],
              tab_sel == TAB_TREE ? "[Tree]" : k_tabs[TAB_TREE],
              tab_sel == TAB_HELP ? "[Help]" : k_tabs[TAB_HELP]);
     mvprintw(0, w - 16, "MS-DOS Shell");
@@ -197,7 +199,7 @@ static void draw_ui(const CliOptions *opts,
 
     attron(COLOR_PAIR(2));
     mvhline(1, 0, ' ', w);
-    mvprintw(1, 1, "C:\\ [A:] [B:] [C:] [D:] [E:] [F:] [USB:]");
+    mvprintw(1, 1, "Drives: [A:] [B:] [C:] [D:] [E:] [F:] [G:]");
     mvprintw(1, w - 11, "Cartag UI");
     mvhline(2, 0, ' ', w);
     mvprintw(2, 1, "%s", k_submenus[(int)tab_sel]);
@@ -205,10 +207,11 @@ static void draw_ui(const CliOptions *opts,
 
     mvhline(3, 0, ACS_HLINE, w);
     mvprintw(3, 2, "Directory Tree");
-    snprintf(line, sizeof(line), "input=%-.24s | export=%-.18s | org=%s",
+    snprintf(line, sizeof(line), "input=%-.21s export=%-.14s org=%s focus=%s",
              opts->input[0] ? opts->input : "(not set)",
              opts->export_path[0] ? opts->export_path : "(not set)",
-             organize_name(opts->organize));
+             organize_name(opts->organize),
+             k_focus_name[(int)focus]);
     mvprintw(3, left_w + 2, "%s", line);
 
     mvaddch(files_top, 0, ACS_ULCORNER);
@@ -250,7 +253,7 @@ static void draw_ui(const CliOptions *opts,
     mvaddch(util_top, 0, ACS_ULCORNER);
     mvhline(util_top, 1, ACS_HLINE, w - 2);
     mvaddch(util_top, w - 1, ACS_URCORNER);
-    mvprintw(util_top, 2, "Disk Utilities");
+    mvprintw(util_top, 2, "Command Menu");
 
     for (i = 1; i < util_h - 1; ++i) {
         mvaddch(util_top + i, 0, ACS_VLINE);
@@ -272,13 +275,13 @@ static void draw_ui(const CliOptions *opts,
     attron(COLOR_PAIR(2));
     mvhline(h - 1, 0, ' ', w);
     if (tmv) strftime(timebuf, sizeof(timebuf), "%H:%M", tmv); else str_copy(timebuf, sizeof(timebuf), "--:--");
-    mvprintw(h - 1, 1, "F10=Actions TAB=Switch <-/->=Tabs ENTER=Select ESC=Exit");
+    mvprintw(h - 1, 1, "F1=Help TAB=Switch <-/->=Tabs ENTER=Exec R=Run Q=Quit ESC=Exit");
     mvprintw(h - 1, w - 6, "%5s", timebuf);
     attroff(COLOR_PAIR(2));
 
     attron(COLOR_PAIR(5));
     mvhline(h - 2, 0, ' ', w);
-    mvprintw(h - 2, 0, "Message: %-*.*s", w - 10, w - 10, msg ? msg : "");
+    mvprintw(h - 2, 0, "C:\\CARTAG> %-*.*s", w - 12, w - 12, msg ? msg : "");
     attroff(COLOR_PAIR(5));
 
     refresh();
@@ -388,7 +391,7 @@ static int tui_run_fallback(CliOptions *opts) {
     char cmd[64], buf[CARTAG_PATH_MAX], msg[128];
     PreviewState pv;
     memset(&pv, 0, sizeof(pv));
-    str_copy(msg, sizeof(msg), "fallback mode");
+    str_copy(msg, sizeof(msg), "DOS fallback mode");
 
     for (;;) {
         printf("\n[CARTAG fallback] input=%s export=%s msg=%s\n",
@@ -432,7 +435,7 @@ int tui_run(CliOptions *opts) {
     if (!isatty(0)) return tui_run_fallback(opts);
 
     memset(&pv, 0, sizeof(pv));
-    str_copy(msg, sizeof(msg), "Emacs-like TUI: TAB troca foco, <-/-> tabs, ENTER executa.");
+    str_copy(msg, sizeof(msg), "DOSSHELL: TAB troca foco, <-/-> troca menu, ENTER executa.");
 
     initscr();
     keypad(stdscr, TRUE);
